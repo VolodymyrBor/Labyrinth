@@ -1,0 +1,5 @@
+WALL = '■'
+EMPTY = '□'
+ENTER = '❌'
+VISITED = 1
+NOT_VISITED = 0
