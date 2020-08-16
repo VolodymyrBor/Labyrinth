@@ -4,8 +4,8 @@ from typing import overload, Union, List, Iterable
 import numpy as np
 from tqdm import tqdm
 
-from settings import VISITED
-from utils import Coord
+from .utils import Coord
+from .settings import VISITED
 
 
 class Matrix:

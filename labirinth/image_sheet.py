@@ -3,7 +3,6 @@ from typing import Iterable, Iterator, Tuple
 
 import numpy as np
 from PIL import Image
-from tqdm import tqdm
 
 
 class ImageSheet:
@@ -13,14 +12,12 @@ class ImageSheet:
 
     def create_sheet(self) -> Image.Image:
         rows, columns, h_image, w_image, _ = self.images.shape
-        status = tqdm(total=rows * columns, desc='Generating Image', unit='Image')
         sheet = Image.new('RGB', (h_image * rows, w_image * columns))
         for y, group in enumerate(self):
             for x, image_array in enumerate(group):
                 image_array = (image_array * 255)
                 image = Image.fromarray(image_array)
                 sheet.paste(image, (x * w_image, y * h_image))
-                status.update()
 
         return sheet
 
