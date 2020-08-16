@@ -1,1 +1,3 @@
-TOKEN = '1343270106:AAGlwF2DoSyzK0I35SmChEZ1eNVgjpe7ZYE'
+import os
+
+TOKEN = os.environ.get('BOT_TOKEN') or 'TOKEN'

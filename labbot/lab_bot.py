@@ -18,6 +18,7 @@ from .conv_helper import add_messages_to_delete, end_conv, delete_messages, cont
 logger = logging.getLogger(__name__)
 
 BLOCK_SIZE = 64
+LIMIT = 150
 
 START_CONV, CHOSE_MODE, GENERATE_LAB, SOLVE_LAB = range(4)
 
@@ -72,6 +73,10 @@ def generate_lab(update: Update, context: CallbackContext):
 
     if is_even(lab_size):
         lab_size += 1
+
+    if lab_size > LIMIT:
+        message.reply_text(f'Size is too long(max: {LIMIT}).😞')
+        return None
 
     add_messages_to_delete(context, message.reply_text("I got size. I'm generating labyrinth ⚙️⚙️⚙️"))
     lab = Labyrinth(lab_size, lab_size)
