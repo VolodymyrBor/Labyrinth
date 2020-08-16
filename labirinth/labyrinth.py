@@ -1,3 +1,4 @@
+import logging
 from io import BytesIO
 from random import choice
 from collections import deque
@@ -20,6 +21,7 @@ class Labyrinth:
     def __init__(self, height: int = 5, width: int = 5, lab: Iterable[Iterable[str]] = None):
         self._height = height
         self._width = width
+        self.logger = logging.getLogger(type(self).__name__)
 
         self._labyrinth = []
         if lab is not None:
@@ -125,19 +127,25 @@ class Labyrinth:
         sheet = self.generate_image(block_size)
         sheet.show(title)
 
-    def create_enter(self, col: int):
-
+    def create_enter(self, col: int) -> Coord:
         lab = [row[1:-1] for row in self]
         column = map(itemgetter(col), lab)
         empty_cell = [i for i, cell in enumerate(column) if cell == EMPTY]
         row_idx = choice(empty_cell)
         cord_enter = Coord(col, row_idx)
         self[cord_enter] = ENTER
+        return cord_enter
 
     def find_enter(self, col: int) -> Coord:
         column = list(map(itemgetter(col), self))
-        row = column.index(ENTER)
-        return Coord(col, row)
+        try:
+            row = column.index(ENTER)
+        except ValueError as err:
+            self.logger.debug(f'Enter not found: {err}')
+        else:
+            return Coord(col, row)
+
+        return self.create_enter(col)
 
     def solve(self, enter_col: int = 0, exit_col: int = -1):
         way = self.get_solved_way(enter_col, exit_col)
