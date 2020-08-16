@@ -1,28 +1,23 @@
 import logging
 from tempfile import NamedTemporaryFile
 
+
 from telegram.update import Update
 from telegram.message import Message
 from telegram.ext.callbackcontext import CallbackContext
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, File, Chat, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import (Updater, CommandHandler, Dispatcher, ConversationHandler, MessageHandler,
-                          Filters, CallbackQueryHandler)
+from telegram.ext import CommandHandler, ConversationHandler, MessageHandler, Filters, CallbackQueryHandler
+from telegram import (InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, File, ReplyKeyboardMarkup,
+                      KeyboardButton)
 
+from .utils import is_even
 from labirinth import Labyrinth
-from bot_settings import TOKEN
-from labbot.patterns import NUMBER, START_CONV_PATTERN, START_CONV_TEXT
-from labirinth.utils import is_even
-from labbot.conv_helper import add_messages_to_delete, end_conv, delete_messages, continue_conv
+from .patterns import NUMBER, START_CONV_PATTERN, START_CONV_TEXT
+from .conv_helper import add_messages_to_delete, end_conv, delete_messages, continue_conv
 
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
 
 logger = logging.getLogger(__name__)
 
 BLOCK_SIZE = 64
-
 
 START_CONV, CHOSE_MODE, GENERATE_LAB, SOLVE_LAB = range(4)
 
@@ -118,16 +113,3 @@ conversation = ConversationHandler(
     },
     fallbacks=[start_command],
 )
-
-
-def main():
-    updater = Updater(TOKEN, use_context=True)
-    db: Dispatcher = updater.dispatcher
-    db.add_handler(start_command)
-    db.add_handler(conversation)
-    updater.start_polling()
-    updater.idle()
-
-
-if __name__ == '__main__':
-    main()
