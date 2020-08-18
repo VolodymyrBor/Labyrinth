@@ -1,3 +1,4 @@
+import math
 import logging
 from io import BytesIO
 from random import choice
@@ -13,7 +14,11 @@ from .matrix import Matrix
 from .gif import DynamicGIF
 from .utils import is_even, Coord
 from .image_sheet import ImageSheet
-from .settings import WALL, VISITED, ENTER, EMPTY
+from .settings import WALL, VISITED, ENTER, EMPTY, SUPPORT_EXTENSIONS
+
+
+class LabyrinthError(Exception):
+    pass
 
 
 class Labyrinth:
@@ -137,14 +142,15 @@ class Labyrinth:
         return cord_enter
 
     def find_enter(self, col: int) -> Coord:
-        column = list(map(itemgetter(col), self))
-        try:
-            row = column.index(ENTER)
-        except ValueError as err:
-            self.logger.debug(f'Enter not found: {err}')
-        else:
-            return Coord(col, row)
 
+        for y, row in enumerate(self._labyrinth):
+            for x, el in enumerate(row):
+                if el == ENTER:
+                    coord = Coord(x, y)
+                    self[coord] = EMPTY
+                    return coord
+
+        self.logger.debug(f'Enter not found.')
         return self.create_enter(col)
 
     def solve(self, enter_col: int = 0, exit_col: int = -1):
@@ -163,11 +169,11 @@ class Labyrinth:
                 gif.append(snapshot)
             gif.save_gif(path)
 
-    def get_solved_way(self, enter_col: int = 0, exit_col: int = -1) -> Iterable[Coord]:
+    def get_solved_way(self, enter_col: int = 0, exit_col: int = -1) -> List[Coord]:
         matrix = self.get_matrix()
         start = self.find_enter(enter_col)
         end = self.find_enter(exit_col)
-        way = matrix.bfs(start, end)
+        way = [start, *matrix.bfs(start, end), end]
         return way
 
     def mark_solve_from_way(self, way: Iterable[Coord]):
@@ -188,11 +194,12 @@ class Labyrinth:
         return EMPTY
 
     @classmethod
-    def from_pil_image(cls, image: Image.Image, block_size: int = 64) -> 'Labyrinth':
+    def from_pil_image(cls, image: Image.Image) -> 'Labyrinth':
         image = image.convert('RGB')
         w, h = image.size
         binary = image.point(lambda p: p > 128)
         array = np.array(binary)
+        block_size = cls.recognize_block_size(array)
         lab = np.array([
             [
                 cls.get_element(array[i: i + block_size, j: j + block_size])
@@ -203,9 +210,9 @@ class Labyrinth:
         return Labyrinth(*lab.shape, lab=list(lab))
 
     @classmethod
-    def from_image(cls, path: str, block_size: int = 64) -> 'Labyrinth':
+    def from_image(cls, path: str) -> 'Labyrinth':
         image: Image.Image = Image.open(path)
-        return cls.from_pil_image(image, block_size)
+        return cls.from_pil_image(image)
 
     @staticmethod
     def get_element(image: np.ndarray) -> str:
@@ -215,6 +222,34 @@ class Labyrinth:
             return ENTER
         else:
             return WALL
+
+    @staticmethod
+    def recognize_block_size(array: np.ndarray) -> int:
+        block_size = math.inf
+        counter = 0
+        h, w = array.shape[:2]
+        with tqdm(total=h * w, desc='Recognize blocks size.') as status:
+            for row in array:
+                previous: np.ndarray = row[0]
+                for current in row:
+                    if np.ndarray.all(current == previous):
+                        counter += 1
+                    else:
+                        block_size = min(block_size, counter)
+                        counter = 1
+                    previous = current
+                    status.update()
+                else:
+                    block_size = min(block_size, counter)
+                    counter = 0
+
+        if block_size == math.inf:
+            raise LabyrinthError('Can not recognize block_size.')
+
+        if block_size not in SUPPORT_EXTENSIONS:
+            raise LabyrinthError(f'Block size : {block_size} is not supported.')
+
+        return block_size
 
     def __str__(self):
         return str('\n'.join(map(str, self._labyrinth)))

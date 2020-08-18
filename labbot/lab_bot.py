@@ -10,9 +10,10 @@ from telegram import (InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery,
                       KeyboardButton)
 
 from .utils import is_even
-from labirinth import Labyrinth
-from .patterns import NUMBER, START_CONV_PATTERN, START_CONV_TEXT
+from labirinth import Labyrinth, LabyrinthError
+from . import patterns
 from .conv_helper import add_messages_to_delete, end_conv, delete_messages, continue_conv
+from labirinth.settings import LOW_EXTENSION, MEDIUM_EXTENSION, HEIGHT_EXTENSION
 
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 BLOCK_SIZE = 64
 LIMIT = 150
 
-START_CONV, CHOSE_MODE, GENERATE_LAB, SOLVE_LAB = range(4)
+START_CONV, CHOSE_MODE, GENERATE_LAB, SOLVE_LAB, CHOSE_EXTENSION = range(5)
 
 GENERATE, SOLVE = range(2)
 
@@ -28,7 +29,7 @@ GENERATE, SOLVE = range(2)
 @continue_conv(START_CONV)
 def start(update: Update, context: CallbackContext):
     message: Message = update.message
-    button = KeyboardButton(START_CONV_TEXT, callback_data=START_CONV_TEXT)
+    button = KeyboardButton(patterns.START_CONV_TEXT, callback_data=patterns.START_CONV_TEXT)
     message.reply_text('Press GO to start.', reply_markup=ReplyKeyboardMarkup([[button]]))
 
 
@@ -54,14 +55,34 @@ def chose_mode(update: Update, context: CallbackContext):
     add_messages_to_delete(context, query.message)
 
     if mode == GENERATE:
-        query.edit_message_text('Enter lab size (e.g 64):')
-        return GENERATE_LAB
+        keyboard = [
+            [
+                InlineKeyboardButton('LOW', callback_data=LOW_EXTENSION),
+                InlineKeyboardButton('MEDIUM', callback_data=MEDIUM_EXTENSION),
+                InlineKeyboardButton('HEIGHT', callback_data=HEIGHT_EXTENSION),
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        query.edit_message_text('Chose extension:', reply_markup=reply_markup)
+        return CHOSE_EXTENSION
 
     if mode == SOLVE:
         query.edit_message_text('Send labyrinth(PLS in document mode).')
         return SOLVE_LAB
 
     raise ValueError('Wrong mode.')
+
+
+@continue_conv(GENERATE_LAB)
+def chose_extension(update: Update, context: CallbackContext):
+    query: CallbackQuery = update.callback_query
+    query.answer()
+    extension = int(query.data)
+    chat_data: dict = context.chat_data
+    chat_data['extension'] = extension
+
+    message: Message = query.message
+    add_messages_to_delete(context, message.reply_text('Enter lab size (e.g 64):'))
 
 
 @end_conv
@@ -82,9 +103,9 @@ def generate_lab(update: Update, context: CallbackContext):
     add_messages_to_delete(context, message)
     lab = Labyrinth(lab_size, lab_size)
     lab.generate()
-
+    extension = context.chat_data.get('extension', LOW_EXTENSION)
     with NamedTemporaryFile(suffix='.jpg') as lab_image:
-        lab.save_as_image(path=lab_image.name)
+        lab.save_as_image(path=lab_image.name, block_size=extension)
         message.reply_document(lab_image)
 
 
@@ -98,7 +119,11 @@ def solve_lab(update: Update, context: CallbackContext):
     lab_file: File = message.document.get_file()
     with NamedTemporaryFile(suffix='.jpg') as lab_image:
         lab_file.download(lab_image.name)
-        lab = Labyrinth.from_image(lab_image.name)
+        try:
+            lab = Labyrinth.from_image(lab_image.name)
+        except LabyrinthError:
+            message.reply_text("I couldn't solve 😭.")
+            return None
 
     lab.solve()
 
@@ -110,11 +135,12 @@ def solve_lab(update: Update, context: CallbackContext):
 start_command = CommandHandler('start', start)
 
 conversation = ConversationHandler(
-    entry_points=[MessageHandler(Filters.regex(START_CONV_PATTERN), start_conv)],
+    entry_points=[MessageHandler(Filters.regex(patterns.START_CONV), start_conv)],
     states={
         CHOSE_MODE: [CallbackQueryHandler(chose_mode)],
-        GENERATE_LAB: [MessageHandler(Filters.regex(NUMBER), generate_lab)],
+        GENERATE_LAB: [MessageHandler(Filters.regex(patterns.NUMBER), generate_lab)],
         SOLVE_LAB: [MessageHandler(Filters.document, solve_lab)],
+        CHOSE_EXTENSION: [CallbackQueryHandler(chose_extension, pattern=patterns.EXTENSION)],
     },
     fallbacks=[start_command],
 )
