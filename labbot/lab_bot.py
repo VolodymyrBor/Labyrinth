@@ -79,12 +79,12 @@ def generate_lab(update: Update, context: CallbackContext):
         return None
 
     add_messages_to_delete(context, message.reply_text("I got size. I'm generating labyrinth ⚙️⚙️⚙️"))
+    add_messages_to_delete(context, message)
     lab = Labyrinth(lab_size, lab_size)
     lab.generate()
 
     with NamedTemporaryFile(suffix='.jpg') as lab_image:
         lab.save_as_image(path=lab_image.name)
-        message.delete()
         message.reply_document(lab_image)
 
 
