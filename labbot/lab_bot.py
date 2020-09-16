@@ -121,7 +121,7 @@ def solve_lab(update: Update, context: CallbackContext):
         lab_file.download(lab_image.name)
         try:
             lab = Labyrinth.from_image(lab_image.name)
-        except LabyrinthError:
+        except (LabyrinthError, IndexError):
             message.reply_text("I couldn't solve 😭.")
             return None
 
